@@ -197,25 +197,39 @@ struct CardCalibrationView: View {
 }
 
 // Flat-surface level: the bubble floats away from the low side.
+// Phone on its side (screen upright): a tube along whichever screen axis is closer to horizontal.
 struct BubbleLevel: View {
     @State private var tilt = Tilt()
     private let radius = 70.0
 
     var body: some View {
         let g = tilt.gravity
-        let degrees = acos(min(1, -g.z)) * 180 / .pi
+        let upright = abs(g.z) < 0.7
+        let alongX = abs(g.x) < abs(g.y) // gravity mostly along y: level line runs along x
         let gain = 4.0 // ~15° tilt reaches the ring
         let scale = gain / max(1, hypot(g.x, g.y) * gain) // keep the bubble inside the ring
+        let degrees = upright ? asin(min(1, abs(alongX ? g.x : g.y))) * 180 / .pi
+                              : acos(min(1, -g.z)) * 180 / .pi
         let level = degrees < 1
+        let dx = upright ? (alongX ? -g.x * radius * gain : 0) : -g.x * radius * scale
+        let dy = upright ? (alongX ? 0 : g.y * radius * gain) : g.y * radius * scale
+        let limit = radius // tube half-length
         VStack(spacing: 10) {
             ZStack {
-                Circle().stroke(.secondary, lineWidth: 2)
-                Circle().stroke(.secondary.opacity(0.5), lineWidth: 1).frame(width: 34, height: 34)
+                if upright {
+                    Capsule().stroke(.secondary, lineWidth: 2)
+                        .frame(width: alongX ? limit * 2 + 30 : 44, height: alongX ? 44 : limit * 2 + 30)
+                    Capsule().stroke(.secondary.opacity(0.5), lineWidth: 1)
+                        .frame(width: alongX ? 34 : 44, height: alongX ? 44 : 34)
+                } else {
+                    Circle().stroke(.secondary, lineWidth: 2)
+                    Circle().stroke(.secondary.opacity(0.5), lineWidth: 1).frame(width: 34, height: 34)
+                }
                 Circle()
                     .fill(level ? .green : .orange)
                     .frame(width: 30, height: 30)
-                    .offset(x: -g.x * radius * scale, y: g.y * radius * scale)
-                    .animation(.easeOut(duration: 0.1), value: g.x)
+                    .offset(x: upright ? max(-limit, min(limit, dx)) : dx, y: upright ? max(-limit, min(limit, dy)) : dy)
+                    .animation(.easeOut(duration: 0.1), value: g.x + g.y)
             }
             .frame(width: radius * 2 + 30, height: radius * 2 + 30)
             Text("\(degrees, specifier: "%.1f")°").font(.headline.monospacedDigit()).foregroundStyle(.secondary)
