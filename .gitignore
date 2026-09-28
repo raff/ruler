@@ -3,3 +3,7 @@ xcuserdata/
 build/
 DerivedData/
 .claude/settings.local.json
+*.xcuserstate
+*.ipa
+*.dSYM.zip
+*.dSYM
